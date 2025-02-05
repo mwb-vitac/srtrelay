@@ -18,6 +18,9 @@ type = "http"
 [auth.static]
 allow = ["play/*"]
 
+[auth.staticsecure]
+passphrasemap = {abc="0123456789", def="9876543210"}
+
 [auth.http]
 url = "http://localhost:1235/publish"
 timeout = "5s"

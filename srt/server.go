@@ -128,6 +128,21 @@ func (s *ServerImpl) listenCallback(socket *srtgo.SrtSocket, version int, addr *
 		return false
 	}
 
+	// Set the passphrase option in the SRT socket
+	// Does s.config.Auth implement the auth.AuthSecure interface?
+	t, ok := s.config.Auth.(auth.AuthSecure)
+	if ok {
+		passphrase := t.GetPassphrase(streamid)
+		if passphrase != "" {
+			if err := socket.SetSockOptString(srtgo.SRTO_PASSPHRASE, passphrase); err != nil {
+				log.Printf("Error setting passphrase: %s", err)
+			}
+			// delay the response because the connection might fail if passphrase is wrong
+			// this delay is not harmful in the success case
+			time.Sleep(250 * time.Millisecond)
+		}
+	}
+
 	return true
 }
 

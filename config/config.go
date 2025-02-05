@@ -43,9 +43,10 @@ type AppConfig struct {
 }
 
 type AuthConfig struct {
-	Type   string
-	Static auth.StaticAuthConfig
-	HTTP   auth.HTTPAuthConfig
+	Type         string
+	Static       auth.StaticAuthConfig
+	StaticSecure auth.StaticSecureAuthConfig
+	HTTP         auth.HTTPAuthConfig
 }
 
 type APIConfig struct {
@@ -61,6 +62,8 @@ func GetAuthenticator(conf AuthConfig) (auth.Authenticator, error) {
 		return auth.NewStaticAuth(conf.Static), nil
 	case "http":
 		return auth.NewHTTPAuth(conf.HTTP), nil
+	case "staticsecure":
+		return auth.NewStaticSecureAuth(conf.Static, conf.StaticSecure), nil
 	default:
 		return nil, fmt.Errorf("Unknown auth type '%v'", conf.Type)
 	}
@@ -100,6 +103,10 @@ func Parse(paths []string) (*Config, error) {
 			Static: auth.StaticAuthConfig{
 				// Allow everything by default
 				Allow: []string{"*"},
+			},
+			StaticSecure: auth.StaticSecureAuthConfig{
+				// Empty map by default
+				PassphraseMap: map[string]string{},
 			},
 			HTTP: auth.HTTPAuthConfig{
 				URL:           "http://localhost:8080/publish",
