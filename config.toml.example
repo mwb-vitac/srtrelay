@@ -48,8 +48,9 @@ addresses = ["localhost:1337"]
 #address = ":8080"
 
 [auth]
-# Choose between available auth types (static and http)
-# for further config options see below
+# Choose between available auth types (static, staticsecure or http)
+# For further config options see below
+# Default: "static"
 #type = "static"
 
 [auth.static]
@@ -57,7 +58,17 @@ addresses = ["localhost:1337"]
 # Each pattern is matched to the client streamid
 # in the form of <mode>/<stream-name>/<password>
 # Allows using * as wildcard (will match across slashes)
+# Default: "*" => allow play or publish anything
 #allow = ["*", "publish/foo/bar", "play/*"]
+
+[auth.staticsecure]
+# SRT passphrase is applied to the connection.  The SRT callback function
+# looks up the passphrase from the passphrasemap using the <password>
+# portion of the streamid as a key.
+# Use empty value "" or omit key from the map for no passphrase.
+# Note: "staticsecure" extends "static" => can also specify [auth.static]
+# Default: empty map
+#passphrasemap = {abc="0123456789", def="9876543210"}
 
 [auth.http]
 # Streams are authenticated using HTTP POST calls against this URL

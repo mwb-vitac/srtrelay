@@ -143,6 +143,18 @@ func (s *ServerImpl) listenCallback(socket *srtgo.SrtSocket, version int, addr *
 		}
 	}
 
+	// Set the passphrase option in the SRT socket
+	// Does s.config.Auth implement the auth.AuthSecure interface?
+	t, ok := s.config.Auth.(auth.AuthSecure)
+	if ok {
+		passphrase := t.GetPassphrase(streamid)
+		if passphrase != "" {
+			if err := socket.SetSockOptString(srtgo.SRTO_PASSPHRASE, passphrase); err != nil {
+				log.Printf("Error setting passphrase: %s", err)
+			}
+		}
+	}
+
 	return true
 }
 
