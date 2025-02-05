@@ -116,7 +116,26 @@ func (s *ServerImpl) listenCallback(socket *srtgo.SrtSocket, version int, addr *
 	// Parse stream id
 	if err := streamid.FromString(idstring); err != nil {
 		log.Println(err)
+		// Slow down retries - VLC player retries very quickly without backoff,
+		// and this can cause problems in an nginx reverse proxy server because
+		// UPD messages are remembered as connections for 10 mins by default.
+		// If nginx hits its default limit of 768 connections then it will block.
+		// Part 1 of fix is to set proxy_timeout 20s; in the server block of nginx.conf.
+		// Part 2 of fix is to delay the response from this method in failure cases.
+		time.Sleep(250 * time.Millisecond)
 		return false
+	}
+
+	// Reject ModePlay requests here if the stream is not present
+	if streamid.Mode() == stream.ModePlay {
+		if !s.relay.CheckExisting(streamid.Name()) {
+			log.Printf("listenCallback: stream does not exist: %s", streamid.Name())
+			if err := socket.SetRejectReason(srtgo.RejectionReasonNotFound); err != nil {
+				log.Printf("Error rejecting stream: %s", err)
+			}
+			time.Sleep(250 * time.Millisecond)
+			return false
+		}
 	}
 
 	// Check authentication
@@ -125,6 +144,7 @@ func (s *ServerImpl) listenCallback(socket *srtgo.SrtSocket, version int, addr *
 		if err := socket.SetRejectReason(srtgo.RejectionReasonUnauthorized); err != nil {
 			log.Printf("Error rejecting stream: %s", err)
 		}
+		time.Sleep(250 * time.Millisecond)
 		return false
 	}
 

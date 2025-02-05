@@ -21,6 +21,7 @@ type Relay interface {
 	Publish(string) (chan<- []byte, error)
 	Subscribe(string) (<-chan []byte, UnsubscribeFunc, error)
 	GetStatistics() []*StreamStatistics
+	CheckExisting(string) bool
 }
 
 type StreamStatistics struct {
@@ -92,6 +93,14 @@ func (s *RelayImpl) Subscribe(name string) (<-chan []byte, UnsubscribeFunc, erro
 	}
 	ch, unsub := channel.Sub()
 	return ch, unsub, nil
+}
+
+// CheckExisting returns true if a stream name exists in the channels map
+func (s *RelayImpl) CheckExisting(name string) bool {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	_, ok := s.channels[name]
+	return ok
 }
 
 func (s *RelayImpl) GetStatistics() []*StreamStatistics {
