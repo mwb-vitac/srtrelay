@@ -1,9 +1,12 @@
 package auth
 
 import (
+	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/voc/srtrelay/internal/metrics"
@@ -27,11 +30,17 @@ var requestDurations = promauto.NewHistogramVec(
 )
 
 type httpAuth struct {
-	config HTTPAuthConfig
-	client *http.Client
+	config        HTTPAuthConfig
+	client        *http.Client
+	passphraseMap map[string]string
+	mutex         sync.Mutex
 }
 
 type Duration time.Duration
+
+type authInfo struct {
+	Passphrase string
+}
 
 func (d *Duration) UnmarshalText(b []byte) error {
 	x, err := time.ParseDuration(string(b))
@@ -58,6 +67,7 @@ func NewHTTPAuth(authConfig HTTPAuthConfig) Authenticator {
 			Timeout:   time.Duration(authConfig.Timeout),
 			Transport: promhttp.InstrumentRoundTripperDuration(m, http.DefaultTransport),
 		},
+		passphraseMap: map[string]string{},
 	}
 }
 
@@ -81,9 +91,36 @@ func (h *httpAuth) Authenticate(streamid stream.StreamID) bool {
 	}
 	defer response.Body.Close()
 
+	// store passphrase from response body for later use if needed
+	bodyBytes, err := io.ReadAll(response.Body)
+	if err == nil {
+		var info authInfo
+		err := json.Unmarshal(bodyBytes, &info)
+		if err == nil {
+			h.mutex.Lock()
+			defer h.mutex.Unlock()
+			h.passphraseMap[streamid.Password()] = info.Passphrase
+		}
+	}
+
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return false
 	}
 
 	return true
+}
+
+// Implement AuthSecure
+
+// Return stored passphrase
+func (h *httpAuth) GetPassphrase(streamid stream.StreamID) string {
+	if streamid.Password() != "" {
+		h.mutex.Lock()
+		defer h.mutex.Unlock()
+		passphrase, ok := h.passphraseMap[streamid.Password()]
+		if ok {
+			return passphrase
+		}
+	}
+	return ""
 }
