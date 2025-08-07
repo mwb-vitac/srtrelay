@@ -91,20 +91,25 @@ func (h *httpAuth) Authenticate(streamid stream.StreamID) bool {
 	}
 	defer response.Body.Close()
 
+	// remove any stored passphrase for this streamid.Name()
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	delete(h.passphraseMap, streamid.Name())
+
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return false
+	}
+
 	// store passphrase from response body for later use if needed
 	bodyBytes, err := io.ReadAll(response.Body)
 	if err == nil {
 		var info authInfo
+		// if "passphrase" is not in bodyBytes,
+		// json.Unmarshall will set info.Passphrase to "".
 		err := json.Unmarshal(bodyBytes, &info)
 		if err == nil {
-			h.mutex.Lock()
-			defer h.mutex.Unlock()
-			h.passphraseMap[streamid.Password()] = info.Passphrase
+			h.passphraseMap[streamid.Name()] = info.Passphrase
 		}
-	}
-
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return false
 	}
 
 	return true
@@ -114,10 +119,10 @@ func (h *httpAuth) Authenticate(streamid stream.StreamID) bool {
 
 // Return stored passphrase
 func (h *httpAuth) GetPassphrase(streamid stream.StreamID) string {
-	if streamid.Password() != "" {
+	if streamid.Name() != "" {
 		h.mutex.Lock()
 		defer h.mutex.Unlock()
-		passphrase, ok := h.passphraseMap[streamid.Password()]
+		passphrase, ok := h.passphraseMap[streamid.Name()]
 		if ok {
 			return passphrase
 		}
