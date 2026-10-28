@@ -110,7 +110,7 @@ func (s *ServerImpl) listenCallback(socket *srtgo.SrtSocket, version int, addr *
 
 	// Parse stream id
 	if err := streamid.FromString(idstring); err != nil {
-		log.Println(err)
+		log.Printf("listenCallback: %s in %s", err, idstring)
 		return false
 	}
 
@@ -166,7 +166,11 @@ func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) err
 
 	sck := srtgo.NewSrtSocket(host, port, options)
 	if err := sck.SetSockOptInt(srtgo.SRTO_LOSSMAXTTL, int(s.config.LossMaxTTL)); err != nil {
-		log.Printf("Error settings lossmaxttl: %s", err)
+		log.Printf("Error setting lossmaxttl: %s", err)
+	}
+    // srtgo does not expose SRTO_UDP_RCVBUF but srtrelay imports the C header srt.h so we get it from there
+	if err := sck.SetSockOptInt(int(C.SRTO_UDP_RCVBUF), 16*1024*1024); err != nil {
+		log.Printf("Error setting udp_rcvbuf: %s", err)
 	}
 	sck.SetListenCallback(s.listenCallback)
 	err := sck.Listen(s.config.ListenBacklog)
@@ -233,7 +237,7 @@ func (s *ServerImpl) Handle(ctx context.Context, sock *srtgo.SrtSocket, addr *ne
 
 	// Parse stream id
 	if err := streamid.FromString(idstring); err != nil {
-		log.Println(err)
+		log.Printf("Handle: %s in %s", err, idstring)
 		return
 	}
 
